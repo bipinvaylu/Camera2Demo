@@ -36,6 +36,7 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
@@ -240,7 +241,8 @@ public class Camera2VideoFragment extends Fragment
     };
     private Integer mSensorOrientation;
     private String mNextVideoAbsolutePath;
-    private CaptureRequest.Builder mPreviewBuilder;
+    private CaptureRequest.Builder mPreviewRequestBuilder;
+    private CaptureRequest.Builder mRecordingRequestBuilder;
 
     /**
      * This is the output file for our picture.
@@ -533,13 +535,11 @@ public class Camera2VideoFragment extends Fragment
             SurfaceTexture texture = mTextureView.getSurfaceTexture();
             assert texture != null;
             texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
-            mPreviewBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
 
             final Surface previewSurface = new Surface(texture);
-            mPreviewBuilder.addTarget(previewSurface);
-            Surface imageSurface = mYUVImageReader.getSurface();
-            mPreviewBuilder.addTarget(imageSurface);
-            mCameraDevice.createCaptureSession(Arrays.asList(imageSurface, previewSurface),
+            mPreviewRequestBuilder.addTarget(previewSurface);
+            mCameraDevice.createCaptureSession(Collections.singletonList(previewSurface),
                     new CameraCaptureSession.StateCallback() {
 
                         @Override
@@ -585,13 +585,10 @@ public class Camera2VideoFragment extends Fragment
             return;
         }
         try {
-            setUpCaptureRequestBuilder(mPreviewBuilder);
-//            java.lang.IllegalArgumentException: CaptureRequest contains unconfigured Input/Output Surface!
-//            Surface imageSurface = mYUVImageReader.getSurface();
-//            mPreviewBuilder.addTarget(imageSurface);
+            setUpCaptureRequestBuilder(mPreviewRequestBuilder);
             HandlerThread thread = new HandlerThread("CameraPreview");
             thread.start();
-            mPreviewSession.setRepeatingRequest(mPreviewBuilder.build(), null, mBackgroundHandler);
+            mPreviewSession.setRepeatingRequest(mPreviewRequestBuilder.build(), null, mBackgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -677,22 +674,22 @@ public class Camera2VideoFragment extends Fragment
             SurfaceTexture texture = mTextureView.getSurfaceTexture();
             assert texture != null;
             texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
-            mPreviewBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+            mRecordingRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
             List<Surface> surfaces = new ArrayList<>();
 
             // Set up Surface for the camera preview
             Surface previewSurface = new Surface(texture);
             surfaces.add(previewSurface);
-            mPreviewBuilder.addTarget(previewSurface);
+            mRecordingRequestBuilder.addTarget(previewSurface);
 
             // Set up Surface for the MediaRecorder
             Surface recorderSurface = mMediaRecorder.getSurface();
             surfaces.add(recorderSurface);
-            mPreviewBuilder.addTarget(recorderSurface);
+            mRecordingRequestBuilder.addTarget(recorderSurface);
 
             Surface imageSurface = mYUVImageReader.getSurface();
             surfaces.add(imageSurface);
-            mPreviewBuilder.addTarget(imageSurface);
+            mRecordingRequestBuilder.addTarget(imageSurface);
 
             // Start a capture session
             // Once the session starts, we can update the UI and start recording
@@ -701,7 +698,18 @@ public class Camera2VideoFragment extends Fragment
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
                     mPreviewSession = cameraCaptureSession;
-                    updatePreview(getCameraPreviewCallback());
+//                    updatePreview(getCameraPreviewCallback());
+                    if (null == mCameraDevice) {
+                        return;
+                    }
+                    try {
+//                        setUpCaptureRequestBuilder(mPreviewRequestBuilder);
+                        HandlerThread thread = new HandlerThread("CameraRecording");
+                        thread.start();
+                        mPreviewSession.setRepeatingRequest(mRecordingRequestBuilder.build(), null, mBackgroundHandler);
+                    } catch (CameraAccessException e) {
+                        e.printStackTrace();
+                    }
                     getActivity().runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
