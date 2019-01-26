@@ -539,7 +539,11 @@ public class Camera2VideoFragment extends Fragment
 
             final Surface previewSurface = new Surface(texture);
             mPreviewRequestBuilder.addTarget(previewSurface);
-            mCameraDevice.createCaptureSession(Collections.singletonList(previewSurface),
+
+            final Surface imageSurface = mYUVImageReader.getSurface();
+            mPreviewRequestBuilder.addTarget(imageSurface);
+
+            mCameraDevice.createCaptureSession(Arrays.asList(imageSurface, previewSurface),
                     new CameraCaptureSession.StateCallback() {
 
                         @Override
@@ -588,7 +592,7 @@ public class Camera2VideoFragment extends Fragment
             setUpCaptureRequestBuilder(mPreviewRequestBuilder);
             HandlerThread thread = new HandlerThread("CameraPreview");
             thread.start();
-            mPreviewSession.setRepeatingRequest(mPreviewRequestBuilder.build(), null, mBackgroundHandler);
+            mPreviewSession.setRepeatingRequest(mPreviewRequestBuilder.build(), null , mBackgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
